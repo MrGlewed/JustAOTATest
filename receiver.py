@@ -28,7 +28,7 @@ def train_ascii(repeat, loop_forever, delay):
         count += 1
     print()
 
-def rotating_arrow(repeat, loop_forever, delay):
+def rotating_arrow_01(repeat, loop_forever, delay):
     frames = [
         "1      \n  1    \n    1  \n      1",
         "0      \n  0    \n    0  \n      0"
@@ -36,7 +36,6 @@ def rotating_arrow(repeat, loop_forever, delay):
     count = 0
     while loop_forever or count < repeat:
         for f in frames:
-            os.system('cls' if os.name=='nt' else 'clear')
             print(f)
             time.sleep(delay)
         count += 1
@@ -70,8 +69,8 @@ def handle_packet(packet):
 
     if pkt_type == "TRAIN_ASCII":
         train_ascii(repeat, loop_forever, delay)
-    elif pkt_type == "ROTATING_ARROW":
-        rotating_arrow(repeat, loop_forever, delay)
+    elif pkt_type == "ROTATING_ARROW_01":
+        rotating_arrow_01(repeat, loop_forever, delay)
     elif pkt_type == "CHROMOSOME":
         chromosome_ladder(repeat, loop_forever, delay)
     elif pkt_type == "BINARY":
@@ -81,7 +80,7 @@ def handle_packet(packet):
     elif pkt_type == "MESSAGE":
         print(f"[MESSAGE] {message}")
     else:
-        print(f"[UNKNOWN] {packet}")
+        print(f"[UNKNOWN PACKET] {packet}")
 
 # ---------------- Main Loop ----------------
 while True:
