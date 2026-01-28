@@ -5,7 +5,7 @@ import random
 import os
 import subprocess
 
-PROJECT_ID = "ascii_project"  # Change per device/project
+PROJECT_ID = "ascii_project"  # change if needed
 PORT = 50555
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -13,103 +13,89 @@ sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 sock.bind(("", PORT))
 sock.setblocking(False)
 
-print(f"[ASCII RECEIVER] '{PROJECT_ID}' listening on port {PORT}...\n")
+print(f"[RECEIVER] Listening as '{PROJECT_ID}' on port {PORT}\n")
 
-# ---------------- ASCII Effects ----------------
+# ---------------- ASCII EFFECTS ----------------
+
 def train_ascii(repeat, loop_forever, delay):
-    train_parts = ["/","|","\\","_","="]
-    train_length = 15
+    chars = ["/", "|", "\\", "_", "="]
     width = 60
-    count = 0
-    while loop_forever or count < repeat:
-        for pos in range(width):
-            line = "".join(random.choice(train_parts) for _ in range(train_length))
-            print(" " * pos + line, end="\r")
+    while loop_forever or repeat > 0:
+        for x in range(width):
+            print(" " * x + "".join(random.choice(chars) for _ in range(12)), end="\r")
             time.sleep(delay)
-        count += 1
+        repeat -= 1
     print()
 
 def rotating_arrow_01(repeat, loop_forever, delay):
     frames = [
-        "1      \n  1    \n    1  \n      1",
-        "0      \n  0    \n    0  \n      0"
+        "1\n 1\n  1\n   1",
+        "   0\n  0\n 0\n0"
     ]
-    count = 0
-    while loop_forever or count < repeat:
+    while loop_forever or repeat > 0:
         for f in frames:
             print(f)
             time.sleep(delay)
-        count += 1
+        repeat -= 1
 
 def chromosome_ladder(repeat, loop_forever, delay):
-    patterns = ["0 | 1", "1 | 0", "0-1", "1-0", "0||1", "1||0"]
-    ladder_height = 10
-    count = 0
-    while loop_forever or count < repeat:
-        for p in patterns:
-            for _ in range(ladder_height):
-                print(p)
-            print()
+    ladder = ["0 | 1", "1 | 0", "0-1", "1-0"]
+    while loop_forever or repeat > 0:
+        for row in ladder:
+            print(row)
             time.sleep(delay)
-        count += 1
+        print()
+        repeat -= 1
 
 def binary_loop(repeat, loop_forever, delay):
-    count = 0
-    while loop_forever or count < repeat:
+    while loop_forever or repeat > 0:
         print("".join(random.choice("01") for _ in range(128)))
-        count += 1
         time.sleep(delay)
+        repeat -= 1
 
-# ---------------- Command Executor ----------------
-def execute_command(cmd):
+# ---------------- COMMAND EXECUTION ----------------
+
+def run_command(cmd):
     try:
-        if os.name == "nt":
-            output = subprocess.check_output(cmd, shell=True, text=True)
-        else:
-            output = subprocess.check_output(cmd, shell=True, text=True)
-        print(f"[COMMAND OUTPUT]\n{output}")
+        output = subprocess.check_output(cmd, shell=True, text=True)
+        print(output)
     except Exception as e:
         print(f"[COMMAND ERROR] {e}")
 
-# ---------------- Packet Dispatcher ----------------
-def handle_packet(packet):
-    pkt_type = packet.get("type")
-    repeat = packet.get("repeat",1)
-    loop_forever = packet.get("loop_forever",False)
-    delay = packet.get("delay",0.1)
-    message = packet.get("message","")
-    cmd = packet.get("command","")
+# ---------------- PACKET HANDLER ----------------
 
-    if pkt_type == "TRAIN_ASCII":
+def handle_packet(pkt):
+    t = pkt.get("type")
+    repeat = pkt.get("repeat", 1)
+    loop_forever = pkt.get("loop_forever", False)
+    delay = pkt.get("delay", 0.1)
+
+    if t == "TRAIN_ASCII":
         train_ascii(repeat, loop_forever, delay)
-    elif pkt_type == "ROTATING_ARROW_01":
+    elif t == "ROTATING_ARROW_01":
         rotating_arrow_01(repeat, loop_forever, delay)
-    elif pkt_type == "CHROMOSOME":
+    elif t == "CHROMOSOME":
         chromosome_ladder(repeat, loop_forever, delay)
-    elif pkt_type == "BINARY":
+    elif t == "BINARY":
         binary_loop(repeat, loop_forever, delay)
-    elif pkt_type == "MESSAGE":
-        print(f"[MESSAGE] {message}")
-    elif pkt_type == "COMMAND":
-        print(f"[EXECUTING COMMAND] {cmd}")
-        execute_command(cmd)
-    elif pkt_type == "UPDATE":
-        print(f"[UPDATE] {packet.get('file')} <- {packet.get('url')}")
+    elif t == "MESSAGE":
+        print(f"[MESSAGE] {pkt.get('message','')}")
+    elif t == "COMMAND":
+        print(f"[COMMAND] {pkt.get('command')}")
+        run_command(pkt.get("command",""))
+    elif t == "UPDATE":
+        print(f"[OTA] {pkt.get('file')} <- {pkt.get('url')}")
     else:
-        print(f"[UNKNOWN PACKET] {packet}")
+        print("[UNKNOWN PACKET]", pkt)
 
-# ---------------- Main Loop ----------------
+# ---------------- MAIN LOOP ----------------
+
 while True:
     try:
-        data, addr = sock.recvfrom(8192)
-        try:
-            packet = json.loads(data.decode())
-        except:
-            continue
-        if not all(k in packet for k in ("type","target")):
-            continue
-        if packet["target"] == PROJECT_ID or packet["target"] == "ALL":
-            handle_packet(packet)
+        data, _ = sock.recvfrom(8192)
+        pkt = json.loads(data.decode())
+        if pkt.get("target") in (PROJECT_ID, "ALL"):
+            handle_packet(pkt)
     except BlockingIOError:
         pass
     time.sleep(0.05)
