@@ -2,10 +2,9 @@ import socket
 import json
 import time
 import random
-import sys
 import os
 
-PROJECT_ID = "ascii_project"  # change per device/project
+PROJECT_ID = "ascii_project"  # Change per device/project
 PORT = 50555
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -13,59 +12,46 @@ sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 sock.bind(("", PORT))
 sock.setblocking(False)
 
-print(f"[ASCII RECEIVER] '{PROJECT_ID}' listening on port {PORT}...")
+print(f"[ASCII RECEIVER] '{PROJECT_ID}' listening on port {PORT}...\n")
 
-# ---------------- ASCII Animations ----------------
-def giant_arrow(repeat, loop_forever, delay):
-    arrows = [
-        "   ^   \n  ^^^  \n ^^^^^ \n^^^^^^^\n   |   ",
-        "   >   \n   >>  \n >>>>> \n>>>>>>>\n   |   ",
-        "   v   \n  vvv  \n vvvvv \nvvvvvvv\n   |   ",
-        "   <   \n  <<   \n <<<<< \n<<<<<<<\n   |   "
-    ]
-    count = 0
-    while loop_forever or count < repeat:
-        for a in arrows:
-            os.system('cls' if os.name == 'nt' else 'clear')
-            print(a)
-            time.sleep(delay)
-        count += 1
-
-def ascii_train(repeat, loop_forever, delay):
-    train = "🚂===>"
-    width = 50
+# ---------------- ASCII Effects ----------------
+def train_ascii(repeat, loop_forever, delay):
+    train_parts = ["/","|","\\","_","="]
+    train_length = 15
+    width = 60
     count = 0
     while loop_forever or count < repeat:
         for pos in range(width):
-            print(" " * pos + train, end="\r")
+            line = "".join(random.choice(train_parts) for _ in range(train_length))
+            print(" " * pos + line, end="\r")
             time.sleep(delay)
         count += 1
     print()
 
-def center_spinner(repeat, loop_forever, delay):
-    frames = ["   |   \n   |   \n   |   ", "   /   \n   /   \n   /   ",
-              "   -   \n   -   \n   -   ", "   \\   \n   \\   \n   \\   "]
+def rotating_arrow(repeat, loop_forever, delay):
+    frames = [
+        "1      \n  1    \n    1  \n      1",
+        "0      \n  0    \n    0  \n      0"
+    ]
     count = 0
     while loop_forever or count < repeat:
         for f in frames:
-            os.system('cls' if os.name == 'nt' else 'clear')
+            os.system('cls' if os.name=='nt' else 'clear')
             print(f)
             time.sleep(delay)
         count += 1
 
-def matrix_rain(repeat, loop_forever, delay, color="green"):
-    COLORS = {"green":"\033[32m", "red":"\033[31m", "blue":"\033[34m",
-              "cyan":"\033[36m", "reset":"\033[0m"}
-    rain_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()"
-    color_code = COLORS.get(color, COLORS["green"])
+def chromosome_ladder(repeat, loop_forever, delay):
+    patterns = ["0 | 1", "1 | 0", "0-1", "1-0", "0||1", "1||0"]
+    ladder_height = 10
     count = 0
     while loop_forever or count < repeat:
-        os.system('cls' if os.name == 'nt' else 'clear')
-        for _ in range(20):
-            line = "".join(random.choice(rain_chars + " ") for _ in range(80))
-            print(color_code + line + COLORS["reset"])
+        for p in patterns:
+            for _ in range(ladder_height):
+                print(p)
+            print()
+            time.sleep(delay)
         count += 1
-        time.sleep(delay)
 
 def binary_loop(repeat, loop_forever, delay):
     count = 0
@@ -77,23 +63,23 @@ def binary_loop(repeat, loop_forever, delay):
 # ---------------- Packet Dispatcher ----------------
 def handle_packet(packet):
     pkt_type = packet.get("type")
-    repeat = packet.get("repeat", 1)
-    loop_forever = packet.get("loop_forever", False)
-    delay = packet.get("delay", 0.1)
-    color = packet.get("color", "green")
+    repeat = packet.get("repeat",1)
+    loop_forever = packet.get("loop_forever",False)
+    delay = packet.get("delay",0.1)
+    message = packet.get("message","")
 
-    if pkt_type == "GIANT_ARROW":
-        giant_arrow(repeat, loop_forever, delay)
-    elif pkt_type == "ASCII_TRAIN":
-        ascii_train(repeat, loop_forever, delay)
-    elif pkt_type == "CENTER_SPINNER":
-        center_spinner(repeat, loop_forever, delay)
-    elif pkt_type == "MATRIX_RAIN":
-        matrix_rain(repeat, loop_forever, delay, color)
+    if pkt_type == "TRAIN_ASCII":
+        train_ascii(repeat, loop_forever, delay)
+    elif pkt_type == "ROTATING_ARROW":
+        rotating_arrow(repeat, loop_forever, delay)
+    elif pkt_type == "CHROMOSOME":
+        chromosome_ladder(repeat, loop_forever, delay)
     elif pkt_type == "BINARY":
         binary_loop(repeat, loop_forever, delay)
     elif pkt_type == "UPDATE":
         print(f"[UPDATE] {packet.get('file')} <- {packet.get('url')}")
+    elif pkt_type == "MESSAGE":
+        print(f"[MESSAGE] {message}")
     else:
         print(f"[UNKNOWN] {packet}")
 
