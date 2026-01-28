@@ -1,198 +1,104 @@
-import socket, json, time, os, sys, random, platform, threading
+import socket, json, time, os, sys, threading, random
 
 PORT = 50555
-PROJECT_ID = "ALL"
 
-# ================= TERMINAL =================
+# ---------------- Terminal ----------------
 def clear():
     os.system("cls" if os.name == "nt" else "clear")
 
-# ================= SAFE SOCKET =================
-def create_socket():
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    while True:
-        try:
-            s.bind(("", PORT))
-            break
-        except OSError:
-            print("[!] Port busy, retrying...")
-            time.sleep(2)
-    return s
+# ---------------- Socket ----------------
+sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+sock.bind(("", PORT))
 
-sock = create_socket()
-
+last_packet = time.time()
+IDLE_TIMEOUT = 40
+screensaver = False
 running = True
-last_packet_time = time.time()
-IDLE_TIMEOUT = 30
-screensaver_running = False
 
-# ================= FASTFETCH++ =================
-def fastfetch(value=False):
+# ---------------- RISC‑V Boot Emulation ----------------
+def riscv_boot():
     clear()
-    osys = platform.system()
-    print(f"OS: {osys}")
-    print(f"ARCH: {platform.machine()}")
-    print(f"PY: {sys.version.split()[0]}")
-    if value:
-        for _ in range(15):
-            print(f"{random.randint(0,65535):016b}  {random.randint(0,255):02X}")
-            time.sleep(0.08)
+    stages = [
+        ("OpenSBI v1.3", 0.6),
+        ("Platform: QEMU virt", 0.4),
+        ("Hart 0 ready", 0.3),
+        ("Jumping to supervisor mode", 0.5),
+        ("U-Boot 2024.01 (riscv64)", 0.6),
+        ("DRAM: 512 MiB", 0.3),
+        ("Loading Linux kernel...", 0.6),
+        ("Starting kernel...", 0.4),
+    ]
 
-# ================= EFFECTS =================
-def matrix():
-    clear()
-    w = os.get_terminal_size().columns
+    kernel = [
+        "[    0.000000] Linux version 6.7.0-riscv",
+        "[    0.112341] SBI specification v1.0 detected",
+        "[    0.223512] Zone ranges:",
+        "[    0.338291] Memory: 498MB available",
+        "[    0.551901] RCU init",
+        "[    0.892314] Mounting root filesystem",
+        "[    1.203912] systemd[1]: systemd 255 running",
+        "[    1.412332] systemd: Starting services",
+        "[    2.112981] Network initialized",
+        "[    2.804212] Reached target Multi-User",
+    ]
+
+    for t, d in stages:
+        print(t)
+        time.sleep(d)
+
+    for line in kernel:
+        print(line)
+        time.sleep(random.uniform(0.15, 0.35))
+
+    print("\nArch Linux RISC-V")
+    print("riscv64 login:")
+
+# ---------------- Screensaver ----------------
+def idle_loop():
+    global screensaver
     while running:
-        print("".join(random.choice("01") for _ in range(w)))
-        time.sleep(0.05)
-
-def hexdump():
-    clear()
-    a = 0
-    for _ in range(80):
-        print(f"{a:08X} " + " ".join(f"{random.randint(0,255):02X}" for _ in range(16)))
-        a += 16
-        time.sleep(0.03)
-
-def chaos():
-    clear()
-    v = random.randint(0,65535)
-    for _ in range(150):
-        v ^= (v << 1) & 0xFFFF
-        print(f"{v:016b} {v:04X}")
-        time.sleep(0.03)
-
-def dna():
-    clear()
-    for i in range(200):
-        s = i % 20
-        print(" " * s + "01====10")
-        time.sleep(0.04)
-
-def train():
-    clear()
-    t = "/|\\_/=|\\_/=|\\_/="
-    for i in range(80):
-        clear()
-        print(" " * i + t)
-        time.sleep(0.05)
-
-def arrow():
-    clear()
-    frames = ["↑","→","↓","←"]
-    for _ in range(120):
-        clear()
-        print(random.choice(["101","010"]), random.choice(frames))
-        time.sleep(0.08)
-
-def fakehack():
-    clear()
-    for l in [
-        "[*] Scanning...",
-        "[*] Dumping memory",
-        "[+] Decrypting blocks",
-        "[!] ACCESS GRANTED"
-    ]:
-        print(l)
-        time.sleep(0.6)
-
-def boot():
-    clear()
-    for l in ["BIOS INIT","LOADING KERNEL","STARTING USERSPACE","login:"]:
-        print(l)
-        time.sleep(0.4)
-
-# ================= SCREENSAVER GAMES =================
-def snake():
-    w,h = 30,10
-    s = [(15,5)]
-    d = (1,0)
-    while screensaver_running:
-        x,y = s[-1]
-        nx,ny = (x+d[0])%w,(y+d[1])%h
-        s.append((nx,ny))
-        if len(s)>6: s.pop(0)
-        clear()
-        for y in range(h):
-            print("".join("O" if (x,y) in s else "." for x in range(w)))
-        d = random.choice([(1,0),(-1,0),(0,1),(0,-1)])
-        time.sleep(0.2)
-
-def pong():
-    w,h = 30,10
-    bx,by = 15,5
-    vx,vy = 1,1
-    py = 5
-    while screensaver_running:
-        bx+=vx; by+=vy
-        if bx<=0 or bx>=w-1: vx*=-1
-        if by<=0 or by>=h-1: vy*=-1
-        py += random.choice([-1,0,1])
-        clear()
-        for y in range(h):
-            print("".join(
-                "O" if (x,y)==(bx,by) else "|" if (x,y)==(2,py) else " "
-                for x in range(w)
-            ))
-        time.sleep(0.1)
-
-def tetris():
-    w,h=20,10
-    while screensaver_running:
-        clear()
-        field=[[" "]*w for _ in range(h)]
-        for _ in range(random.randint(1,4)):
-            field[random.randint(0,h-1)][random.randint(0,w-1)]="#"
-        for r in field: print("".join(r))
-        time.sleep(0.2)
-
-def screensaver_loop():
-    global screensaver_running
-    while running:
-        if time.time()-last_packet_time>IDLE_TIMEOUT:
-            screensaver_running=True
-            for g in [snake,pong,tetris]:
-                if not screensaver_running: break
-                threading.Thread(target=g,daemon=True).start()
-                time.sleep(15)
-            screensaver_running=False
+        if time.time() - last_packet > IDLE_TIMEOUT:
+            screensaver = True
+            ascii_spinner()
+            screensaver = False
         time.sleep(1)
 
-# ================= DISPATCH =================
+def ascii_spinner():
+    clear()
+    frames = ["|", "/", "-", "\\"]
+    while screensaver:
+        for f in frames:
+            print(f"System idle {f}")
+            time.sleep(0.15)
+            clear()
+
+# ---------------- Dispatch ----------------
 def handle(pkt):
-    global last_packet_time, screensaver_running
-    last_packet_time=time.time()
-    screensaver_running=False
+    global last_packet, screensaver
+    last_packet = time.time()
+    screensaver = False
 
-    if pkt.get("target") not in ("ALL",PROJECT_ID): return
+    cmd = pkt.get("command")
 
-    if pkt.get("message")=="__KILL__":
-        clear(); print("HALTED"); sys.exit(0)
+    if cmd == "RISC_V_BOOT":
+        threading.Thread(target=riscv_boot, daemon=True).start()
 
-    if pkt.get("message"):
-        print(pkt["message"])
+    if cmd == "CLEAR":
+        clear()
 
-    cmds={
-        "FASTFETCH":lambda:fastfetch(False),
-        "FASTFETCH_VALUE":lambda:fastfetch(True),
-        "HEX_MATRIX":matrix,
-        "HEX_DUMP_STREAM":hexdump,
-        "BITWISE_CHAOS":chaos,
-        "DNA":dna,
-        "TRAIN_ASCII":train,
-        "ROTATING_ARROW":arrow,
-        "FAKE_HACK":fakehack,
-        "BOOT":boot
-    }
+    if cmd == "KILL":
+        clear()
+        print("System halted.")
+        sys.exit(0)
 
-    if pkt.get("name") in cmds:
-        threading.Thread(target=cmds[pkt["name"]],daemon=True).start()
+# ---------------- Main ----------------
+threading.Thread(target=idle_loop, daemon=True).start()
 
-# ================= START =================
-threading.Thread(target=screensaver_loop,daemon=True).start()
-print("☢️ NUCLEAR RECEIVER ONLINE")
+print("RISC‑V ASCII RECEIVER ONLINE")
 while True:
-    data,_=sock.recvfrom(65535)
-    try: handle(json.loads(data.decode()))
-    except: pass
+    data, _ = sock.recvfrom(65535)
+    try:
+        handle(json.loads(data.decode()))
+    except:
+        pass
