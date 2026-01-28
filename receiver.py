@@ -1,67 +1,114 @@
 import socket
 import json
-import urllib.request
-import shutil
-import os
 import time
+import random
+import sys
+import os
 
-# Configuration
-PROJECT_ID = "example_project"  # Change for each project
+PROJECT_ID = "ascii_project"  # change per device/project
 PORT = 50555
 
-# Setup UDP socket
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 sock.bind(("", PORT))
-sock.setblocking(False)  # Non-blocking socket
+sock.setblocking(False)
 
-print(f"[OTA] Project '{PROJECT_ID}' listening for messages on port {PORT}")
+print(f"[ASCII RECEIVER] '{PROJECT_ID}' listening on port {PORT}...")
 
+# ---------------- ASCII Animations ----------------
+def giant_arrow(repeat, loop_forever, delay):
+    arrows = [
+        "   ^   \n  ^^^  \n ^^^^^ \n^^^^^^^\n   |   ",
+        "   >   \n   >>  \n >>>>> \n>>>>>>>\n   |   ",
+        "   v   \n  vvv  \n vvvvv \nvvvvvvv\n   |   ",
+        "   <   \n  <<   \n <<<<< \n<<<<<<<\n   |   "
+    ]
+    count = 0
+    while loop_forever or count < repeat:
+        for a in arrows:
+            os.system('cls' if os.name == 'nt' else 'clear')
+            print(a)
+            time.sleep(delay)
+        count += 1
 
+def ascii_train(repeat, loop_forever, delay):
+    train = "🚂===>"
+    width = 50
+    count = 0
+    while loop_forever or count < repeat:
+        for pos in range(width):
+            print(" " * pos + train, end="\r")
+            time.sleep(delay)
+        count += 1
+    print()
+
+def center_spinner(repeat, loop_forever, delay):
+    frames = ["   |   \n   |   \n   |   ", "   /   \n   /   \n   /   ",
+              "   -   \n   -   \n   -   ", "   \\   \n   \\   \n   \\   "]
+    count = 0
+    while loop_forever or count < repeat:
+        for f in frames:
+            os.system('cls' if os.name == 'nt' else 'clear')
+            print(f)
+            time.sleep(delay)
+        count += 1
+
+def matrix_rain(repeat, loop_forever, delay, color="green"):
+    COLORS = {"green":"\033[32m", "red":"\033[31m", "blue":"\033[34m",
+              "cyan":"\033[36m", "reset":"\033[0m"}
+    rain_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()"
+    color_code = COLORS.get(color, COLORS["green"])
+    count = 0
+    while loop_forever or count < repeat:
+        os.system('cls' if os.name == 'nt' else 'clear')
+        for _ in range(20):
+            line = "".join(random.choice(rain_chars + " ") for _ in range(80))
+            print(color_code + line + COLORS["reset"])
+        count += 1
+        time.sleep(delay)
+
+def binary_loop(repeat, loop_forever, delay):
+    count = 0
+    while loop_forever or count < repeat:
+        print("".join(random.choice("01") for _ in range(128)))
+        count += 1
+        time.sleep(delay)
+
+# ---------------- Packet Dispatcher ----------------
 def handle_packet(packet):
-    if packet["type"] == "MESSAGE":
-        print("[OTA MESSAGE]:", packet["content"])
+    pkt_type = packet.get("type")
+    repeat = packet.get("repeat", 1)
+    loop_forever = packet.get("loop_forever", False)
+    delay = packet.get("delay", 0.1)
+    color = packet.get("color", "green")
 
-    elif packet["type"] == "UPDATE":
-        github_url = packet["url"]
-        target_file = packet["file"]
-        apply_update(github_url, target_file)
+    if pkt_type == "GIANT_ARROW":
+        giant_arrow(repeat, loop_forever, delay)
+    elif pkt_type == "ASCII_TRAIN":
+        ascii_train(repeat, loop_forever, delay)
+    elif pkt_type == "CENTER_SPINNER":
+        center_spinner(repeat, loop_forever, delay)
+    elif pkt_type == "MATRIX_RAIN":
+        matrix_rain(repeat, loop_forever, delay, color)
+    elif pkt_type == "BINARY":
+        binary_loop(repeat, loop_forever, delay)
+    elif pkt_type == "UPDATE":
+        print(f"[UPDATE] {packet.get('file')} <- {packet.get('url')}")
+    else:
+        print(f"[UNKNOWN] {packet}")
 
-
-def apply_update(url, target_file):
-    print(f"[OTA] Updating {target_file} from GitHub: {url}")
-
-    tmp_file = target_file + ".new"
-    backup_file = target_file + ".bak_" + str(int(time.time()))
-
-    try:
-        urllib.request.urlretrieve(url, tmp_file)
-        shutil.copy2(target_file, backup_file)
-        shutil.move(tmp_file, target_file)
-        print("[OTA] Update applied successfully")
-    except Exception as e:
-        print("[OTA] Update failed:", e)
-
-
-# Main loop
+# ---------------- Main Loop ----------------
 while True:
     try:
-        # Try to read any incoming message
         data, addr = sock.recvfrom(8192)
         try:
             packet = json.loads(data.decode())
-        except Exception:
+        except:
             continue
-
-        # Only process if targeted to this project or ALL
-        if packet.get("target") == PROJECT_ID or packet.get("target") == "ALL":
+        if not all(k in packet for k in ("type","target")):
+            continue
+        if packet["target"] == PROJECT_ID or packet["target"] == "ALL":
             handle_packet(packet)
-
     except BlockingIOError:
-        # No message received, continue main loop
         pass
-
-    # ===== Main project logic goes here =====
-    # Example: simulate work or game loop
-    print("Project running main loop...")
-    time.sleep(1)  # Replace with real work
+    time.sleep(0.05)
