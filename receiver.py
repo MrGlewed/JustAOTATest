@@ -3,14 +3,27 @@ import socket, json, time, os, sys, random, platform, threading
 PORT = 50555
 PROJECT_ID = "ALL"
 
-sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-sock.bind(("", PORT))
-
-running = True
-
 # ================= TERMINAL =================
 def clear():
     os.system("cls" if os.name == "nt" else "clear")
+
+# ================= SAFE SOCKET =================
+def create_socket():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)  # allow reuse
+    while True:
+        try:
+            s.bind(("", PORT))
+            break
+        except OSError as e:
+            print(f"[!] Port {PORT} busy, retrying in 2s...")
+            time.sleep(2)
+    return s
+
+sock = create_socket()
+print(f"[+] Listening on UDP port {PORT}")
+
+running = True
 
 # ================= FASTFETCH++ =================
 def fastfetch(value=False):
@@ -128,6 +141,19 @@ def boot():
         print(l)
         time.sleep(0.4)
 
+# ================= EASTER EGGS =================
+def easter_eggs(msg):
+    triggers = {
+        "0xdeadbeef": lambda: threading.Thread(target=hexdump).start(),
+        "101010": lambda: threading.Thread(target=matrix).start(),
+        "xor": lambda: threading.Thread(target=chaos).start(),
+        "matrix": lambda: threading.Thread(target=matrix).start(),
+        "overflow": lambda: threading.Thread(target=dna).start(),
+    }
+    for key in triggers:
+        if key in msg.lower():
+            triggers[key]()
+
 # ================= DISPATCH =================
 def handle(pkt):
     global running
@@ -143,30 +169,32 @@ def handle(pkt):
         print("SYSTEM HALTED")
         sys.exit(0)
 
+    if msg:
+        easter_eggs(msg)
+        print(msg)
+
     engines = {
-        "FASTFETCH": lambda: fastfetch(False),
-        "FASTFETCH_VALUE": lambda: fastfetch(True),
-        "HEX_MATRIX": matrix,
-        "HEX_DUMP_STREAM": hexdump,
-        "BITWISE_CHAOS": chaos,
-        "DNA": dna,
-        "TRAIN_ASCII": train,
-        "ROTATING_ARROW": arrow,
-        "FAKE_HACK": fakehack,
-        "BOOT": boot,
+        "FASTFETCH": lambda: threading.Thread(target=fastfetch, args=(False,), daemon=True).start(),
+        "FASTFETCH_VALUE": lambda: threading.Thread(target=fastfetch, args=(True,), daemon=True).start(),
+        "HEX_MATRIX": lambda: threading.Thread(target=matrix, daemon=True).start(),
+        "HEX_DUMP_STREAM": lambda: threading.Thread(target=hexdump, daemon=True).start(),
+        "BITWISE_CHAOS": lambda: threading.Thread(target=chaos, daemon=True).start(),
+        "DNA": lambda: threading.Thread(target=dna, daemon=True).start(),
+        "TRAIN_ASCII": lambda: threading.Thread(target=train, daemon=True).start(),
+        "ROTATING_ARROW": lambda: threading.Thread(target=arrow, daemon=True).start(),
+        "FAKE_HACK": lambda: threading.Thread(target=fakehack, daemon=True).start(),
+        "BOOT": lambda: threading.Thread(target=boot, daemon=True).start(),
     }
 
     if name in engines:
-        threading.Thread(target=engines[name], daemon=True).start()
-
-    if msg:
-        print(msg)
+        engines[name]()
 
 # ================= MAIN LOOP =================
 print("NUCLEAR ASCII RECEIVER ONLINE")
 while True:
-    data, _ = sock.recvfrom(65535)
     try:
-        handle(json.loads(data.decode()))
-    except:
-        pass
+        data, _ = sock.recvfrom(65535)
+        pkt = json.loads(data.decode())
+        handle(pkt)
+    except Exception as e:
+        print(f"[!] Packet error: {e}")
