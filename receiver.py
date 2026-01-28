@@ -1,90 +1,198 @@
-import threading, time, random, os, sys
+import socket, json, time, os, sys, random, platform, threading
 
-# ----------------- Global state -----------------
-last_packet_time = time.time()
-IDLE_TIMEOUT = 30  # seconds before screensaver starts
-screensaver_running = False
-running = True
+PORT = 50555
+PROJECT_ID = "ALL"
 
-# ----------------- Terminal -----------------
+# ================= TERMINAL =================
 def clear():
     os.system("cls" if os.name == "nt" else "clear")
 
-# ----------------- Screensaver Games -----------------
-def snake_saver(duration=10):
-    clear()
-    width, height = 30, 10
-    snake = [(width//2, height//2)]
-    direction = (1, 0)
-    for _ in range(duration * 5):
-        head = (snake[-1][0] + direction[0], snake[-1][1] + direction[1])
-        snake.append(head)
-        if len(snake) > 5:
-            snake.pop(0)
-        clear()
-        for y in range(height):
-            line = ""
-            for x in range(width):
-                line += "O" if (x,y) in snake else "."
-            print(line)
-        direction = random.choice([(1,0), (-1,0), (0,1), (0,-1)])
-        time.sleep(0.2)
-        if not screensaver_running: return
+# ================= SAFE SOCKET =================
+def create_socket():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    while True:
+        try:
+            s.bind(("", PORT))
+            break
+        except OSError:
+            print("[!] Port busy, retrying...")
+            time.sleep(2)
+    return s
 
-def pong_saver(duration=10):
+sock = create_socket()
+
+running = True
+last_packet_time = time.time()
+IDLE_TIMEOUT = 30
+screensaver_running = False
+
+# ================= FASTFETCH++ =================
+def fastfetch(value=False):
     clear()
-    width, height = 30, 10
-    ball = [width//2, height//2]
-    vel = [1,1]
-    paddle_y = height//2
-    for _ in range(duration * 5):
-        ball[0] += vel[0]
-        ball[1] += vel[1]
-        if ball[0] <= 0 or ball[0] >= width-1: vel[0] *= -1
-        if ball[1] <= 0 or ball[1] >= height-1: vel[1] *= -1
-        paddle_y += random.choice([-1,0,1])
+    osys = platform.system()
+    print(f"OS: {osys}")
+    print(f"ARCH: {platform.machine()}")
+    print(f"PY: {sys.version.split()[0]}")
+    if value:
+        for _ in range(15):
+            print(f"{random.randint(0,65535):016b}  {random.randint(0,255):02X}")
+            time.sleep(0.08)
+
+# ================= EFFECTS =================
+def matrix():
+    clear()
+    w = os.get_terminal_size().columns
+    while running:
+        print("".join(random.choice("01") for _ in range(w)))
+        time.sleep(0.05)
+
+def hexdump():
+    clear()
+    a = 0
+    for _ in range(80):
+        print(f"{a:08X} " + " ".join(f"{random.randint(0,255):02X}" for _ in range(16)))
+        a += 16
+        time.sleep(0.03)
+
+def chaos():
+    clear()
+    v = random.randint(0,65535)
+    for _ in range(150):
+        v ^= (v << 1) & 0xFFFF
+        print(f"{v:016b} {v:04X}")
+        time.sleep(0.03)
+
+def dna():
+    clear()
+    for i in range(200):
+        s = i % 20
+        print(" " * s + "01====10")
+        time.sleep(0.04)
+
+def train():
+    clear()
+    t = "/|\\_/=|\\_/=|\\_/="
+    for i in range(80):
         clear()
-        for y in range(height):
-            line = ""
-            for x in range(width):
-                if x == 2 and y == paddle_y: line += "|"
-                elif x == ball[0] and y == ball[1]: line += "O"
-                else: line += " "
-            print(line)
+        print(" " * i + t)
+        time.sleep(0.05)
+
+def arrow():
+    clear()
+    frames = ["↑","→","↓","←"]
+    for _ in range(120):
+        clear()
+        print(random.choice(["101","010"]), random.choice(frames))
+        time.sleep(0.08)
+
+def fakehack():
+    clear()
+    for l in [
+        "[*] Scanning...",
+        "[*] Dumping memory",
+        "[+] Decrypting blocks",
+        "[!] ACCESS GRANTED"
+    ]:
+        print(l)
+        time.sleep(0.6)
+
+def boot():
+    clear()
+    for l in ["BIOS INIT","LOADING KERNEL","STARTING USERSPACE","login:"]:
+        print(l)
+        time.sleep(0.4)
+
+# ================= SCREENSAVER GAMES =================
+def snake():
+    w,h = 30,10
+    s = [(15,5)]
+    d = (1,0)
+    while screensaver_running:
+        x,y = s[-1]
+        nx,ny = (x+d[0])%w,(y+d[1])%h
+        s.append((nx,ny))
+        if len(s)>6: s.pop(0)
+        clear()
+        for y in range(h):
+            print("".join("O" if (x,y) in s else "." for x in range(w)))
+        d = random.choice([(1,0),(-1,0),(0,1),(0,-1)])
+        time.sleep(0.2)
+
+def pong():
+    w,h = 30,10
+    bx,by = 15,5
+    vx,vy = 1,1
+    py = 5
+    while screensaver_running:
+        bx+=vx; by+=vy
+        if bx<=0 or bx>=w-1: vx*=-1
+        if by<=0 or by>=h-1: vy*=-1
+        py += random.choice([-1,0,1])
+        clear()
+        for y in range(h):
+            print("".join(
+                "O" if (x,y)==(bx,by) else "|" if (x,y)==(2,py) else " "
+                for x in range(w)
+            ))
         time.sleep(0.1)
-        if not screensaver_running: return
 
-def tetris_saver(duration=10):
-    clear()
-    width, height = 20, 10
-    for _ in range(duration * 5):
-        field = [[" "]*width for _ in range(height)]
-        for _ in range(random.randint(1,4)):
-            x = random.randint(0,width-2)
-            y = random.randint(0,height-2)
-            field[y][x] = random.choice(["#", "@", "%", "&"])
+def tetris():
+    w,h=20,10
+    while screensaver_running:
         clear()
-        for row in field:
-            print("".join(row))
+        field=[[" "]*w for _ in range(h)]
+        for _ in range(random.randint(1,4)):
+            field[random.randint(0,h-1)][random.randint(0,w-1)]="#"
+        for r in field: print("".join(r))
         time.sleep(0.2)
-        if not screensaver_running: return
 
-# ----------------- Screensaver Controller -----------------
 def screensaver_loop():
     global screensaver_running
     while running:
-        idle = time.time() - last_packet_time
-        if idle >= IDLE_TIMEOUT:
-            screensaver_running = True
-            for game in [snake_saver, pong_saver, tetris_saver]:
+        if time.time()-last_packet_time>IDLE_TIMEOUT:
+            screensaver_running=True
+            for g in [snake,pong,tetris]:
                 if not screensaver_running: break
-                game(duration=15)
-            screensaver_running = False
+                threading.Thread(target=g,daemon=True).start()
+                time.sleep(15)
+            screensaver_running=False
         time.sleep(1)
 
-# ----------------- Packet update -----------------
-def handle_packet(pkt):
+# ================= DISPATCH =================
+def handle(pkt):
     global last_packet_time, screensaver_running
-    last_packet_time = time.time()  # reset idle timer
-    screensaver_running = False      # stop screensaver immediately
-    # dispatch effect/game/message as before...
+    last_packet_time=time.time()
+    screensaver_running=False
+
+    if pkt.get("target") not in ("ALL",PROJECT_ID): return
+
+    if pkt.get("message")=="__KILL__":
+        clear(); print("HALTED"); sys.exit(0)
+
+    if pkt.get("message"):
+        print(pkt["message"])
+
+    cmds={
+        "FASTFETCH":lambda:fastfetch(False),
+        "FASTFETCH_VALUE":lambda:fastfetch(True),
+        "HEX_MATRIX":matrix,
+        "HEX_DUMP_STREAM":hexdump,
+        "BITWISE_CHAOS":chaos,
+        "DNA":dna,
+        "TRAIN_ASCII":train,
+        "ROTATING_ARROW":arrow,
+        "FAKE_HACK":fakehack,
+        "BOOT":boot
+    }
+
+    if pkt.get("name") in cmds:
+        threading.Thread(target=cmds[pkt["name"]],daemon=True).start()
+
+# ================= START =================
+threading.Thread(target=screensaver_loop,daemon=True).start()
+print("☢️ NUCLEAR RECEIVER ONLINE")
+while True:
+    data,_=sock.recvfrom(65535)
+    try: handle(json.loads(data.decode()))
+    except: pass
